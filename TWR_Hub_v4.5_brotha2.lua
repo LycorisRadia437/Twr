@@ -1,5 +1,6 @@
 -- Owner : brotha2
 -- Version : V4.9 (Ultimate Dynamic Touch Camera Lock for Mobile)
+-- Ugraded : Lycorisradia437 & Gemini
 -- Game : Those Who Remain
 
 -- ── Auto Clear Cache / Config on Startup ────────────────────────
