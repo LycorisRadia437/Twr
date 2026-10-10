@@ -1,6 +1,15 @@
 -- Owner : brotha2
--- Version : V2.1 (Fixed Config State for ShowNames)
+-- Version : V4.5 (Fixed UI Dragging/Scrolling with Camera View)
 -- Game : Those Who Remain
+
+-- ── Auto Clear Cache / Config on Startup ────────────────────────
+pcall(function()
+    if isfolder and isfolder("TWR_Config") then
+        for _, file in ipairs(listfiles("TWR_Config")) do
+            pcall(function() delfile(file) end)
+        end
+    end
+end)
 
 local Players           = game:GetService("Players")
 local RunService        = game:GetService("RunService")
@@ -17,8 +26,9 @@ local Config = {
     ESP_Players  = false,
     ESP_Zombies  = false,
     ESP_Items    = false,
-    ShowNames    = true,
+    ShowNames    = false,
 
+    BillboardTransparency     = 0.9,
     Chams_PlayerColor         = Color3.fromRGB(0, 120, 255),
     Chams_ZombieColor         = Color3.fromRGB(255, 40, 40),
     Chams_ItemColor           = Color3.fromRGB(0, 255, 255),
@@ -46,23 +56,37 @@ local Config = {
 
 local FBBackup = {}
 
--- ── Load Rayfield Gen2 ─────────────────────────────────────────
-local Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
+-- ── Load Rayfield với cơ chế tự động thử lại / Backup ──────────────
+local Rayfield
+local success, err = pcall(function()
+    Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
+end)
+
+if not success or not Rayfield then
+    pcall(function()
+        Rayfield = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/source"))()
+    end)
+end
+
+if not Rayfield then
+    warn("[TWR Hub Error]: Không thể tải thư viện giao diện Rayfield!")
+    return
+end
 
 local Window = Rayfield:CreateWindow({
-    Name            = "TWR Hub  |  brotha2  ·  v2.1",
+    Name            = "TWR Hub  |  brotha2  ·  v4.5",
     LoadingTitle    = "Those Who Remain",
-    LoadingSubtitle = "v2.1 - Config Fixed Edition",
+    LoadingSubtitle = "v4.5 - UI Anchor Fix",
     Theme           = "Default",
     ConfigurationSaving = {
         Enabled    = true,
         FolderName = "TWR_Config",
-        FileName   = "twr_v21", -- Đổi tên file để làm mới cấu hình
+        FileName   = "twr_v45",
     },
     KeySystem = false,
 })
 
--- ── Credit bar ─────────────────────────────────────────────────
+-- ── Credit bar (Sửa chuẩn tỷ lệ màn hình, không trôi theo camera) ──────────────
 do
     local pg = LocalPlayer:WaitForChild("PlayerGui")
 
@@ -84,6 +108,7 @@ do
     stroke.Thickness = 1
     stroke.Transparency = 0.4
     stroke.Parent = holder
+    
     local grad = Instance.new("UIGradient")
     grad.Color = ColorSequence.new(Color3.fromRGB(60, 120, 220), Color3.fromRGB(150, 200, 255))
     grad.Rotation = 45
@@ -99,7 +124,7 @@ do
     local label = Instance.new("TextLabel")
     label.BackgroundTransparency = 1
     label.Size = UDim2.new(1, 0, 0.55, 0)
-    label.Text = "brotha2  ·  TWR v2.1"
+    label.Text = "brotha2  ·  TWR v4.5"
     label.TextColor3 = Color3.fromRGB(235, 235, 245)
     label.TextStrokeTransparency = 0.8
     label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
@@ -107,16 +132,17 @@ do
     label.TextSize = 12
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = holder
+    
     local labelGrad = Instance.new("UIGradient")
     labelGrad.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(150, 200, 255))
-    labelGrad.Rotation = 0
+    labelGrad.Rotation = 90
     labelGrad.Parent = label
 
     local sub = Instance.new("TextLabel")
     sub.BackgroundTransparency = 1
     sub.Size = UDim2.new(1, 0, 0.4, 0)
     sub.Position = UDim2.new(0, 0, 0.55, 0)
-    sub.Text = "v2.1  ·  those who remain"
+    sub.Text = "v4.5  ·  ui screen fixed"
     sub.TextColor3 = Color3.fromRGB(140, 145, 165)
     sub.Font = Enum.Font.GothamMedium
     sub.TextSize = 10
@@ -178,10 +204,10 @@ local acActive       = false
 local flyBV          = nil
 local flyBG          = nil
 
-local chamsPulse = 0
+local realTimePulse = 0
 task.spawn(function()
     while true do
-        chamsPulse = (math.sin(tick() * 1.5) + 1) / 2
+        realTimePulse = (math.sin(tick() * 3) + 1) / 2
         RunService.Heartbeat:Wait()
     end
 end)
@@ -204,11 +230,17 @@ local function updateZombieList()
     ZombieList = list
 end
 
-local ignoreFolder = workspace:FindFirstChild("Ignore")
-local itemsFolder = ignoreFolder and ignoreFolder:FindFirstChild("Items")
+local function getItemsFolder()
+    local ignore = workspace:FindFirstChild("Ignore")
+    if ignore then
+        return ignore:FindFirstChild("Items")
+    end
+    return nil
+end
 
 local function updateItemList()
     local list = {}
+    local itemsFolder = getItemsFolder()
     if itemsFolder then
         for _, obj in ipairs(itemsFolder:GetDescendants()) do
             if obj:IsA("Model") then
@@ -237,7 +269,9 @@ task.spawn(function()
     end
 end)
 
-local function applyChams(model, color, fillTrans, outlineTrans)
+local function applyChams(model, color, rawFillTrans, outlineTrans)
+    local fillTrans = math.clamp(1 - rawFillTrans, 0, 1)
+
     local existing = chamsObjects[model]
     if not (existing and existing.Parent) then
         local highlight = Instance.new("Highlight")
@@ -253,8 +287,8 @@ local function applyChams(model, color, fillTrans, outlineTrans)
         existing = highlight
     end
 
-    local pulseFill    = math.clamp(fillTrans    + chamsPulse * 0.12,       0, 1)
-    local pulseOutline = math.clamp(outlineTrans + (1 - chamsPulse) * 0.08, 0, 1)
+    local pulseFill    = math.clamp(fillTrans    + realTimePulse * 0.1,  0, 1)
+    local pulseOutline = math.clamp(outlineTrans + (1 - realTimePulse) * 0.05, 0, 1)
 
     existing.FillColor           = color
     existing.OutlineColor        = color
@@ -287,27 +321,46 @@ local function applyClapBombBox(topModel, mainPart)
     if not container then return end
     local itemID = tostring(topModel:GetDebugId())
 
+    local targetColor = Config.Chams_ItemColor
+    pcall(function()
+        if Rayfield.Flags and Rayfield.Flags.Chams_ItemColor then
+            targetColor = Rayfield.Flags.Chams_ItemColor.Color
+        end
+    end)
+
+    local rawFillTrans = Config.Chams_FillTransparency
+    pcall(function()
+        if Rayfield.Flags and Rayfield.Flags.Chams_FillTransparency then
+            rawFillTrans = Rayfield.Flags.Chams_FillTransparency.Value
+        end
+    end)
+
+    local fillTrans = math.clamp(1 - rawFillTrans, 0, 1)
+
     local BOX_X, BOX_Y, BOX_Z = 0.555, 1.945, 0.74
     local targetSize = mainPart.Size + Vector3.new(BOX_X, BOX_Y, BOX_Z)
     local targetOffset = CFrame.new(0, BOX_Y / 4, 0)
 
     local boxName = "Box_" .. itemID
-    if not container:FindFirstChild(boxName) then
-        local clientBox = Instance.new("BoxHandleAdornment")
+    local clientBox = container:FindFirstChild(boxName)
+    if not clientBox then
+        clientBox = Instance.new("BoxHandleAdornment")
         clientBox.Name = boxName
         clientBox.Adornee = mainPart
         clientBox.AlwaysOnTop = true
         clientBox.Size = targetSize
         clientBox.CFrame = targetOffset
-        clientBox.Transparency = 0.6
-        clientBox.Color3 = Color3.fromRGB(0, 255, 255)
         clientBox.ZIndex = 9
         clientBox.Parent = container
     end
 
+    clientBox.Transparency = math.clamp(fillTrans + (realTimePulse * 0.08), 0, 1)
+    clientBox.Color3 = targetColor
+
     local outlineName = "Outline_" .. itemID
-    if not container:FindFirstChild(outlineName) then
-        local outlineFolder = Instance.new("Folder")
+    local outlineFolder = container:FindFirstChild(outlineName)
+    if not outlineFolder then
+        outlineFolder = Instance.new("Folder")
         outlineFolder.Name = outlineName
         outlineFolder.Parent = container
 
@@ -340,12 +393,17 @@ local function applyClapBombBox(topModel, mainPart)
             
             line.Size = Vector3.new(sizeX, sizeY, sizeZ)
             line.CFrame = targetOffset * CFrame.new(midPoint)
-            line.Color3 = Color3.fromRGB(255, 255, 255) 
-            line.Transparency = 0 
             line.AlwaysOnTop = true
             line.ZIndex = 10
             line.Adornee = mainPart
             line.Parent = outlineFolder
+        end
+    end
+
+    for _, line in ipairs(outlineFolder:GetChildren()) do
+        if line:IsA("BoxHandleAdornment") then
+            line.Color3 = targetColor
+            line.Transparency = realTimePulse * 0.3
         end
     end
 end
@@ -378,11 +436,12 @@ local function createESP(model, targetType)
 
     local plate = Instance.new("Frame")
     plate.BackgroundColor3       = Color3.fromRGB(8, 8, 12)
-    plate.BackgroundTransparency = 0.1
+    plate.BackgroundTransparency = Config.BillboardTransparency
     plate.BorderSizePixel        = 0
     plate.Visible                = false
-    plate.ZIndex                 = 3
+    plate.ZIndex                 = 10
     plate.Parent                 = ESP_UI
+    
     local plateCorner = Instance.new("UICorner")
     plateCorner.CornerRadius = UDim.new(0, 4)
     plateCorner.Parent = plate
@@ -390,11 +449,11 @@ local function createESP(model, targetType)
     local plateStroke = Instance.new("UIStroke")
     plateStroke.Color        = accentA
     plateStroke.Thickness    = 1
-    plateStroke.Transparency = 0.35
+    plateStroke.Transparency = 0.5
     plateStroke.Parent       = plate
+    
     local plateGrad = Instance.new("UIGradient")
     plateGrad.Color    = ColorSequence.new(accentA, accentB)
-    plateGrad.Rotation = 0
     plateGrad.Parent   = plateStroke
 
     local platePad = Instance.new("UIPadding")
@@ -408,21 +467,20 @@ local function createESP(model, targetType)
     nameLabel.TextColor3             = Color3.fromRGB(240, 245, 255)
     nameLabel.TextStrokeTransparency = 0.75
     nameLabel.TextStrokeColor3       = Color3.fromRGB(0, 0, 0)
-    nameLabel.TextScaled             = false
     nameLabel.TextSize               = 11
     nameLabel.Font                   = Enum.Font.GothamBold
-    nameLabel.TextXAlignment         = Enum.TextXAlignment.Center
-    nameLabel.TextYAlignment         = Enum.TextYAlignment.Center
     nameLabel.Size                   = UDim2.new(1, 0, 1, 0)
-    nameLabel.Visible                = false
+    nameLabel.ZIndex                 = 11
     nameLabel.Parent                 = plate
+    
     local nameGrad = Instance.new("UIGradient")
     nameGrad.Color    = ColorSequence.new(Color3.fromRGB(255, 255, 255), accentB)
     nameGrad.Rotation = 90
     nameGrad.Parent   = nameLabel
 
-    objs.Plate = plate
-    objs.Name  = nameLabel
+    objs.Plate  = plate
+    objs.Name   = nameLabel
+    objs.Stroke = plateStroke
 
     espObjects[model] = objs
 
@@ -451,34 +509,50 @@ end
 local function updateESP(model, objs, targetPart, topOffset)
     if not objs or not targetPart or not targetPart.Parent then
         if objs.Plate then objs.Plate.Visible = false end
-        if objs.Name  then objs.Name.Visible  = false end
         return
     end
 
-    if not Config.ShowNames then
+    local showNames = Config.ShowNames
+    pcall(function()
+        if Rayfield.Flags and Rayfield.Flags.ShowNames ~= nil then
+            showNames = Rayfield.Flags.ShowNames.Value
+        end
+    end)
+
+    local rawBgTrans = Config.BillboardTransparency
+    pcall(function()
+        if Rayfield.Flags and Rayfield.Flags.BillboardTransparency ~= nil then
+            rawBgTrans = Rayfield.Flags.BillboardTransparency.Value
+        end
+    end)
+
+    local bgTrans = math.clamp(1 - rawBgTrans, 0, 1)
+
+    if not showNames then
         if objs.Plate then objs.Plate.Visible = false end
-        if objs.Name  then objs.Name.Visible  = false end
         return
+    end
+
+    if objs.Plate and objs.Stroke then
+        objs.Plate.BackgroundTransparency = bgTrans
+        objs.Stroke.Transparency = math.clamp(bgTrans + 0.25, 0, 1)
     end
 
     local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position + (topOffset or Vector3.new(0, 0, 0)))
 
     if not onScreen or pos.Z <= 0 then
         if objs.Plate then objs.Plate.Visible = false end
-        if objs.Name  then objs.Name.Visible  = false end
         return
     end
 
     local viewport = Camera.ViewportSize
     if pos.X < -100 or pos.X > viewport.X + 100 or pos.Y < -100 or pos.Y > viewport.Y + 100 then
         if objs.Plate then objs.Plate.Visible = false end
-        if objs.Name  then objs.Name.Visible  = false end
         return
     end
 
     if objs.Plate and objs.Name then
-        objs.Name.Visible = true
-        objs.Name.Text    = model.Name
+        objs.Name.Text = model.Name
 
         local textWidth   = objs.Name.TextBounds.X
         local plateWidth  = math.max(textWidth + 14, 56)
@@ -490,7 +564,7 @@ local function updateESP(model, objs, targetPart, topOffset)
     end
 end
 
--- ── Hitbox — head-modifying ────────────────────────────────────
+-- ── Hitbox với Real-time Pulse ───────────────────────────────
 local function applyHitbox(model, size, transparency)
     if not ZombieList[model] then return end
     if isPlayer(model) then return end
@@ -513,7 +587,7 @@ local function applyHitbox(model, size, transparency)
     end
 
     local color = Config.Hitbox_Color
-    local alpha = math.clamp(transparency, 0, 1)
+    local alpha = math.clamp(transparency + (realTimePulse * 0.15), 0, 1)
 
     head.Size         = Vector3.new(size, size, size)
     head.Transparency = alpha
@@ -522,10 +596,12 @@ local function applyHitbox(model, size, transparency)
     head.CanCollide   = false
     head.Massless     = true
 
-    if not networkOwners[model] then
-        pcall(function() head:SetNetworkOwner(LocalPlayer) end)
-        networkOwners[model] = true
-    end
+    pcall(function()
+        if not networkOwners[model] then
+            head:SetNetworkOwner(LocalPlayer)
+            networkOwners[model] = true
+        end
+    end)
 
     local outlineAlpha = math.clamp(alpha + 0.15, 0, 1)
 
@@ -573,34 +649,31 @@ local function restoreAllHitboxes()
     for model in pairs(originalData) do
         restoreHitbox(model)
     end
-    for model, box in pairs(hitboxOutlines) do
-        pcall(function() box:Destroy() end)
-    end
     hitboxOutlines = {}
     networkOwners  = {}
 end
 
 local function setupAmmoHook()
-    local success, module = pcall(function()
-        return require(LocalPlayer.PlayerScripts.Client.Interact)
-    end)
-    if not success or not module then return end
+    pcall(function()
+        local module = require(LocalPlayer.PlayerScripts.Client.Interact)
+        if not module then return end
 
-    local originalUpdate = module.Update
-    if type(originalUpdate) ~= "function" then return end
+        local originalUpdate = module.Update
+        if type(originalUpdate) ~= "function" then return end
 
-    module.Update = function(self, ...)
-        local args = {...}
-        if args[1] and args[1].Equipped then
-            local weapon      = args[3][args[1].Equipped]
-            local weaponStats = args[1].WeaponModule.Stats
-            if weaponStats and weapon then
-                if weaponStats.Mag  and Config.InfAmmo then weapon.Mag  = weaponStats.Mag  end
-                if weaponStats.Pool and Config.InfAmmo then weapon.Pool = weaponStats.Pool end
+        module.Update = function(self, ...)
+            local args = {...}
+            if args[1] and args[1].Equipped then
+                local weapon      = args[3][args[1].Equipped]
+                local weaponStats = args[1].WeaponModule.Stats
+                if weaponStats and weapon then
+                    if weaponStats.Mag  and Config.InfAmmo then weapon.Mag  = weaponStats.Mag  end
+                    if weaponStats.Pool and Config.InfAmmo then weapon.Pool = weaponStats.Pool end
+                end
             end
+            return originalUpdate(self, unpack(args))
         end
-        return originalUpdate(self, unpack(args))
-    end
+    end)
 end
 
 local function startFly()
@@ -671,7 +744,7 @@ local function updateFly()
     flyBG.CFrame = CFrame.new(hrp.Position, hrp.Position + flatLook)
 end
 
-local function applySpeed()
+local function updateSpeed()
     local char = LocalPlayer.Character
     if not char then return end
     local hum = char:FindFirstChildOfClass("Humanoid")
@@ -680,13 +753,9 @@ local function applySpeed()
     if Config.Fly then return end
 
     if Config.Speed then
-        if hum.WalkSpeed ~= Config.SpeedValue then
-            hum.WalkSpeed = Config.SpeedValue
-        end
+        hum.WalkSpeed = Config.SpeedValue
     else
-        if hum.WalkSpeed ~= 16 then
-            hum.WalkSpeed = 16
-        end
+        hum.WalkSpeed = 16
     end
 end
 
@@ -749,6 +818,13 @@ local function unloadScript()
     pcall(function() restoreAllHitboxes() end)
     pcall(function() stopFly() end)
     pcall(function() applyFullBright(false) end)
+    pcall(function()
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then hum.WalkSpeed = 16 end
+        end
+    end)
 
     local container = getClientContainer()
     if container then container:ClearAllChildren() end
@@ -808,6 +884,7 @@ end)
 LocalPlayer.CharacterAdded:Connect(function()
     task.wait(1)
     if Config.Fly then startFly() end
+    if Config.Speed then updateSpeed() end
 end)
 
 local frameCounter = 0
@@ -827,8 +904,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    applySpeed()
-
     local anyHitbox = Config.Hitbox_Enabled
 
     -- Player ESP
@@ -844,10 +919,9 @@ RunService.RenderStepped:Connect(function()
                     local hrp = model:FindFirstChild("HumanoidRootPart")
                     local hum = model:FindFirstChildOfClass("Humanoid")
                     if head and hrp and hum and hum.Health > 0 then
-                        updateESP(model, objs, head, Vector3.new(0, 0.8, 0))
+                        updateESP(model, objs, head, Vector3.new(0, 2.8, 0))
                     else
                         if objs.Plate then objs.Plate.Visible = false end
-                        if objs.Name  then objs.Name.Visible  = false end
                     end
                 end
                 applyChams(model, Config.Chams_PlayerColor, Config.Chams_FillTransparency, Config.Chams_OutlineTransparency)
@@ -868,10 +942,9 @@ RunService.RenderStepped:Connect(function()
                 local hrp = model:FindFirstChild("HumanoidRootPart")
                 local hum = model:FindFirstChildOfClass("Humanoid")
                 if head and hrp and hum and hum.Health > 0 then
-                    updateESP(model, objs, head, Vector3.new(0, 0.8, 0))
+                    updateESP(model, objs, head, Vector3.new(0, 2.8, 0))
                 else
                     if objs.Plate then objs.Plate.Visible = false end
-                    if objs.Name  then objs.Name.Visible  = false end
                 end
             end
             applyChams(model, Config.Chams_ZombieColor, Config.Chams_FillTransparency, Config.Chams_OutlineTransparency)
@@ -889,7 +962,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Item ESP & Clap Bomb 3D Box
+    -- Item ESP & Exclusive Clap Bomb Box
     for model in pairs(ItemList) do
         if Config.ESP_Items then
             local objs = espObjects[model]
@@ -897,20 +970,24 @@ RunService.RenderStepped:Connect(function()
             if objs then
                 local mainPart = model:FindFirstChild("Handle", true) or model:FindFirstChildWhichIsA("BasePart", true)
                 if mainPart then
-                    updateESP(model, objs, mainPart, Vector3.new(0, 1.8, 0))
+                    updateESP(model, objs, mainPart, Vector3.new(0, 2.5, 0))
                     
-                    if model.Name == "Clap Bomb" or model:FindFirstChild("ClapBomb", true) then
+                    local isClapBomb = (model.Name == "Clap Bomb" or model:FindFirstChild("ClapBomb", true))
+                    if isClapBomb then
                         applyClapBombBox(model, mainPart)
+                        removeChams(model)
+                    else
+                        removeChams(model)
+                        applyChams(model, Config.Chams_ItemColor, Config.Chams_FillTransparency, Config.Chams_OutlineTransparency)
                     end
                 else
                     if objs.Plate then objs.Plate.Visible = false end
-                    if objs.Name  then objs.Name.Visible  = false end
                 end
             end
-            applyChams(model, Config.Chams_ItemColor, Config.Chams_FillTransparency, Config.Chams_OutlineTransparency)
         else
             if espObjects[model] then removeESP(model) end
             removeClapBombBox(model)
+            if chamsObjects[model] then removeChams(model) end
         end
     end
 
@@ -938,43 +1015,66 @@ end)
 --  TABS (Rayfield Gen2 Interface)
 -- ══════════════════════════════════════════════════════════════
 
-local ESPTab = Window:CreateTab({ Name = "ESP", Icon = nil })
+local ESPTab = Window:CreateTab({ Name = "ESP" })
 ESPTab:CreateSection("Targets")
 ESPTab:CreateToggle({Name = "ESP Players", CurrentValue = false, Flag = "ESP_Players", Callback = function(v) Config.ESP_Players = v end})
 ESPTab:CreateToggle({Name = "ESP Zombies", CurrentValue = false, Flag = "ESP_Zombies", Callback = function(v) Config.ESP_Zombies = v end})
 ESPTab:CreateToggle({Name = "ESP Items",   CurrentValue = false, Flag = "ESP_Items",   Callback = function(v) Config.ESP_Items = v end})
-ESPTab:CreateToggle({Name = "Show Names",  CurrentValue = true,  Flag = "ShowNames",   Callback = function(v) Config.ShowNames = v end})
+ESPTab:CreateToggle({
+    Name = "Show Names",
+    CurrentValue = false,
+    Flag = "ShowNames",
+    Callback = function(v)
+        Config.ShowNames = v
+    end
+})
 
 ESPTab:CreateSection("Style & Colors")
 ESPTab:CreateColorPicker({Name = "Player Chams Color", Color = Color3.fromRGB(0, 120, 255), Flag = "Chams_PlayerColor", Callback = function(v) Config.Chams_PlayerColor = v end})
 ESPTab:CreateColorPicker({Name = "Zombie Chams Color", Color = Color3.fromRGB(255, 40, 40), Flag = "Chams_ZombieColor", Callback = function(v) Config.Chams_ZombieColor = v end})
 ESPTab:CreateColorPicker({Name = "Item Chams Color",   Color = Color3.fromRGB(0, 255, 255), Flag = "Chams_ItemColor",   Callback = function(v) Config.Chams_ItemColor = v end})
-ESPTab:CreateSlider({Name = "Fill Transparency",    Range = {0, 1}, Increment = 0.05, Suffix = "", CurrentValue = 0.5, Flag = "Chams_FillTransparency",    Callback = function(v) Config.Chams_FillTransparency    = v end})
-ESPTab:CreateSlider({Name = "Outline Transparency", Range = {0, 1}, Increment = 0.05, Suffix = "", CurrentValue = 0.1, Flag = "Chams_OutlineTransparency", Callback = function(v) Config.Chams_OutlineTransparency = v end})
+ESPTab:CreateSlider({Name = "Fill Transparency",    Range = {0, 1}, Increment = 0.05, CurrentValue = 0.5, Flag = "Chams_FillTransparency",    Callback = function(v) Config.Chams_FillTransparency    = v end})
+ESPTab:CreateSlider({Name = "Outline Transparency", Range = {0, 1}, Increment = 0.05, CurrentValue = 0.1, Flag = "Chams_OutlineTransparency", Callback = function(v) Config.Chams_OutlineTransparency = v end})
+ESPTab:CreateSlider({
+    Name = "Billboard Transparency",
+    Range = {0, 1},
+    Increment = 0.05,
+    CurrentValue = 0.1,
+    Flag = "BillboardTransparency",
+    Callback = function(v)
+        Config.BillboardTransparency = v
+    end
+})
 
-local HitboxTab = Window:CreateTab({ Name = "Hitbox", Icon = nil })
+local HitboxTab = Window:CreateTab({ Name = "Hitbox" })
 HitboxTab:CreateSection("Zombie Hitbox")
 HitboxTab:CreateToggle({Name = "Enable Hitbox", CurrentValue = false, Flag = "Hitbox_Enabled", Callback = function(v) Config.Hitbox_Enabled = v; if not v then restoreAllHitboxes() end end})
 HitboxTab:CreateSlider({Name = "Size",         Range = {3, 60}, Increment = 1,    Suffix = " studs", CurrentValue = 15,  Flag = "Hitbox_Size",         Callback = function(v) Config.Hitbox_Size         = v end})
-HitboxTab:CreateSlider({Name = "Transparency", Range = {0, 1},  Increment = 0.05, Suffix = "",       CurrentValue = 0.7, Flag = "Hitbox_Transparency", Callback = function(v) Config.Hitbox_Transparency = v end})
+HitboxTab:CreateSlider({Name = "Transparency", Range = {0, 1},  Increment = 0.05, CurrentValue = 0.7, Flag = "Hitbox_Transparency", Callback = function(v) Config.Hitbox_Transparency = v end})
 HitboxTab:CreateSection("Style")
 HitboxTab:CreateColorPicker({Name = "Color", Color = Color3.fromRGB(255, 0, 80), Flag = "Hitbox_Color", Callback = function(v) Config.Hitbox_Color = v end})
 HitboxTab:CreateButton({Name = "Restore", Callback = function() restoreAllHitboxes() end})
 
-local WeaponTab = Window:CreateTab({ Name = "Weapon", Icon = nil })
+local WeaponTab = Window:CreateTab({ Name = "Weapon" })
 WeaponTab:CreateToggle({Name = "Infinite Ammo", CurrentValue = false, Flag = "InfAmmo", Callback = function(v) Config.InfAmmo = v end})
 
-local MovementTab = Window:CreateTab({ Name = "Movement", Icon = nil })
+local MovementTab = Window:CreateTab({ Name = "Movement" })
 MovementTab:CreateSection("Fly")
 MovementTab:CreateToggle({Name = "Fly", CurrentValue = false, Flag = "Fly", Callback = function(v) Config.Fly = v end})
-MovementTab:CreateSlider({Name = "Fly Speed", Range = {10, 200}, Increment = 5, Suffix = "", CurrentValue = 50, Flag = "FlySpeed", Callback = function(v) Config.FlySpeed = v end})
+MovementTab:CreateSlider({Name = "Fly Speed", Range = {10, 200}, Increment = 5, CurrentValue = 50, Flag = "FlySpeed", Callback = function(v) Config.FlySpeed = v end})
 MovementTab:CreateSection("Speed")
-MovementTab:CreateToggle({Name = "Speed", CurrentValue = false, Flag = "Speed", Callback = function(v) Config.Speed = v end})
-MovementTab:CreateSlider({Name = "Speed Value", Range = {16, 100}, Increment = 1, Suffix = "", CurrentValue = 40, Flag = "SpeedValue", Callback = function(v) Config.SpeedValue = v end})
+MovementTab:CreateToggle({Name = "Speed", CurrentValue = false, Flag = "Speed", Callback = function(v)
+    Config.Speed = v
+    updateSpeed()
+end})
+MovementTab:CreateSlider({Name = "Speed Value", Range = {16, 100}, Increment = 1, CurrentValue = 40, Flag = "SpeedValue", Callback = function(v)
+    Config.SpeedValue = v
+    if Config.Speed then updateSpeed() end
+end})
 MovementTab:CreateSection("Jump")
 MovementTab:CreateToggle({Name = "Infinite Jump", CurrentValue = false, Flag = "InfiniteJump", Callback = function(v) Config.InfiniteJump = v end})
 
-local MiscTab = Window:CreateTab({ Name = "Misc", Icon = nil })
+local MiscTab = Window:CreateTab({ Name = "Misc" })
 MiscTab:CreateSection("Utility")
 MiscTab:CreateToggle({Name = "Full Bright", CurrentValue = false, Flag = "FullBright", Callback = function(v)
     Config.FullBright = v
@@ -1002,8 +1102,16 @@ MiscTab:CreateKeybind({
     end
 })
 
-local ACTab = Window:CreateTab({ Name = "Anti Cheat Bypass", Icon = nil })
+local ACTab = Window:CreateTab({ Name = "Anti Cheat Bypass" })
 ACTab:CreateToggle({Name = "Enable", CurrentValue = false, Flag = "AC_Bypass", Callback = function(v) Config.AC_Bypass = v; if v then enableACBypass() else disableACBypass() end end})
 
-notify("Đã tải TWR Hub v2.1 (Đã đồng bộ Show Names)!")
---bạn có thể fix all lỗi tìm dc cho those who remain bản mới nhất hiên hiện tại trong roblox ko?
+-- Safe notification wrapper
+pcall(function()
+    if Rayfield and type(Rayfield.Notify) == "function" then
+        Rayfield:Notify({
+            Title = "TWR Hub v4.5",
+            Content = "Đã sửa hoàn toàn lỗi UI bị kéo trôi theo màn hình!",
+            Duration = 6.5,
+        })
+    end
+end)
