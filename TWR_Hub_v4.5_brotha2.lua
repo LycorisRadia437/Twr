@@ -1,5 +1,6 @@
 -- Owner : brotha2
 -- Version : V4.5 (Fixed UI Dragging/Scrolling with Camera View)
+-- Upgraded : LycorisRadia437
 -- Game : Those Who Remain
 
 -- ── Auto Clear Cache / Config on Startup ────────────────────────
