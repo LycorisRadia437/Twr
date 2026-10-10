@@ -1,6 +1,5 @@
 -- Owner : brotha2
--- Version : V4.5 (Fixed UI Dragging/Scrolling with Camera View)
--- Upgraded : LycorisRadia437
+-- Version : V4.9 (Ultimate Dynamic Touch Camera Lock for Mobile)
 -- Game : Those Who Remain
 
 -- ── Auto Clear Cache / Config on Startup ────────────────────────
@@ -75,19 +74,58 @@ if not Rayfield then
 end
 
 local Window = Rayfield:CreateWindow({
-    Name            = "TWR Hub  |  brotha2  ·  v4.5",
+    Name            = "TWR Hub  |  brotha2  ·  v4.9",
     LoadingTitle    = "Those Who Remain",
-    LoadingSubtitle = "v4.5 - UI Anchor Fix",
+    LoadingSubtitle = "v4.9 - Dynamic Touch Camera Lock",
     Theme           = "Default",
     ConfigurationSaving = {
         Enabled    = true,
         FolderName = "TWR_Config",
-        FileName   = "twr_v45",
+        FileName   = "twr_v49",
     },
     KeySystem = false,
 })
 
--- ── Credit bar (Sửa chuẩn tỷ lệ màn hình, không trôi theo camera) ──────────────
+-- ── Hệ thống khóa camera động khi chạm vào giao diện (Mobile Friendly) ──────────────
+local cameraLockedByUI = false
+local savedCamType = Enum.CameraType.Custom
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local pos = input.Position
+        local objects = UserInputService:GetGuiObjectsAtPosition(Vector2.new(pos.X, pos.Y))
+        local overUI = false
+        for _, obj in ipairs(objects) do
+            local p = obj
+            while p and p ~= LocalPlayer.PlayerGui do
+                local n = p.Name:lower()
+                if n:find("rayfield") or n:find("sirius") or n:find("twr") then
+                    overUI = true
+                    break
+                end
+                p = p.Parent
+            end
+            if overUI then break end
+        end
+
+        if overUI then
+            if not cameraLockedByUI then
+                savedCamType = Camera.CameraType
+                Camera.CameraType = Enum.CameraType.Scriptable
+                cameraLockedByUI = true
+            end
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) and cameraLockedByUI then
+        Camera.CameraType = savedCamType
+        cameraLockedByUI = false
+    end
+end)
+
+-- ── Credit bar ─────────────────────────────────────────────────
 do
     local pg = LocalPlayer:WaitForChild("PlayerGui")
 
@@ -125,7 +163,7 @@ do
     local label = Instance.new("TextLabel")
     label.BackgroundTransparency = 1
     label.Size = UDim2.new(1, 0, 0.55, 0)
-    label.Text = "brotha2  ·  TWR v4.5"
+    label.Text = "brotha2  ·  TWR v4.9"
     label.TextColor3 = Color3.fromRGB(235, 235, 245)
     label.TextStrokeTransparency = 0.8
     label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
@@ -143,7 +181,7 @@ do
     sub.BackgroundTransparency = 1
     sub.Size = UDim2.new(1, 0, 0.4, 0)
     sub.Position = UDim2.new(0, 0, 0.55, 0)
-    sub.Text = "v4.5  ·  ui screen fixed"
+    sub.Text = "v4.9  ·  dynamic touch lock"
     sub.TextColor3 = Color3.fromRGB(140, 145, 165)
     sub.Font = Enum.Font.GothamMedium
     sub.TextSize = 10
@@ -826,6 +864,12 @@ local function unloadScript()
             if hum then hum.WalkSpeed = 16 end
         end
     end)
+    pcall(function()
+        if cameraLockedByUI then
+            Camera.CameraType = savedCamType
+            cameraLockedByUI = false
+        end
+    end)
 
     local container = getClientContainer()
     if container then container:ClearAllChildren() end
@@ -1110,8 +1154,8 @@ ACTab:CreateToggle({Name = "Enable", CurrentValue = false, Flag = "AC_Bypass", C
 pcall(function()
     if Rayfield and type(Rayfield.Notify) == "function" then
         Rayfield:Notify({
-            Title = "TWR Hub v4.5",
-            Content = "Đã sửa hoàn toàn lỗi UI bị kéo trôi theo màn hình!",
+            Title = "TWR Hub v4.9",
+            Content = "Đã tích hợp Khóa Camera Động theo thao tác chạm trên mobile!",
             Duration = 6.5,
         })
     end
