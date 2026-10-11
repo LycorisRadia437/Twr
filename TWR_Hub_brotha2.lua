@@ -1,7 +1,7 @@
--- Owner : brotha2
--- Upgraded : Lycorisradia437 & Gemini
--- Version : V6.0 (Official Rayfield Gen2 Button Implementation & Zombie ESP Fix)
--- Game : Those Who Remain
+-- Owner : brotha2[span_2](start_span)[span_2](end_span)
+-- Upgraded : Lycorisradia437 & Gemini[span_3](start_span)[span_3](end_span)
+-- Version : V6.0 (Official Rayfield Gen2 Button Implementation & Zombie ESP Fix)[span_4](start_span)[span_4](end_span)
+-- Game : Those Who Remain[span_5](start_span)[span_5](end_span)
 
 -- ── Auto Clear Cache / Config on Startup ────────────────────────
 pcall(function()
@@ -219,17 +219,20 @@ local function isPlayer(model)
     return Players:GetPlayerFromCharacter(model) ~= nil
 end
 
--- Bộ lọc chuẩn: Chỉ nhận zombie đang spawn, có di chuyển và máu > 0
+-- Đã sửa: Chỉ lấy các zombie có trong workspace.Entities.Infected[span_6](start_span)[span_6](end_span)
 local function updateZombieList()
     local list = {}
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") then
-            local hum = obj:FindFirstChildOfClass("Humanoid")
-            local hrp = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso")
-            if hum and hrp and not isPlayer(obj) and hum.Health > 0 then
-                local name = obj.Name:lower()
-                if not name:find("shop") and not name:find("merchant") and not name:find("dummy") and not name:find("tutorial") and not name:find("bank") then
-                    list[obj] = true
+    local entities = workspace:FindFirstChild("Entities")
+    if entities then
+        local infected = entities:FindFirstChild("Infected")
+        if infected then
+            for _, obj in ipairs(infected:GetChildren()) do
+                if obj:IsA("Model") then
+                    local hum = obj:FindFirstChildOfClass("Humanoid")
+                    local hrp = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso")
+                    if hum and hrp and hum.Health > 0 then
+                        list[obj] = true
+                    end
                 end
             end
         end
@@ -1023,7 +1026,7 @@ end)
 --  TABS (Rayfield Gen2 Interface)
 -- ══════════════════════════════════════════════════════════════
 
-local ESPTab = Window:CreateTab({ Name = "ESP" })
+local ESPTab = Window:CreateTab({ Name = "Esp" })
 ESPTab:CreateSection("Targets")
 ESPTab:CreateToggle({Name = "ESP Players", CurrentValue = false, Flag = "ESP_Players", Callback = function(v) Config.ESP_Players = v end})
 ESPTab:CreateToggle({Name = "ESP Zombies", CurrentValue = false, Flag = "ESP_Zombies", Callback = function(v) Config.ESP_Zombies = v end})
@@ -1054,7 +1057,6 @@ ESPTab:CreateSlider({
     end
 })
 
--- Nút Clear ESP Cache (Dùng đúng chuẩn CreateButton của Gen2)
 ESPTab:CreateButton({
     Name = "Reset Esp",
     Callback = function()
@@ -1084,7 +1086,6 @@ HitboxTab:CreateSlider({Name = "Transparency", Range = {0, 1},  Increment = 0.05
 HitboxTab:CreateSection("Style")
 HitboxTab:CreateColorPicker({Name = "Color", Color = Color3.fromRGB(255, 0, 80), Flag = "Hitbox_Color", Callback = function(v) Config.Hitbox_Color = v end})
 
--- Nút Restore (Dùng đúng chuẩn CreateButton của Gen2)
 HitboxTab:CreateButton({
     Name = "Reset Hitbox",
     Callback = function()
@@ -1126,7 +1127,6 @@ MiscTab:CreateToggle({Name = "Full Bright", CurrentValue = false, Flag = "FullBr
 end})
 MiscTab:CreateToggle({Name = "Anti-AFK", CurrentValue = true, Flag = "AntiAFK", Callback = function(v) Config.AntiAFK = v end})
 
--- Nút Unload Script (Dùng đúng chuẩn CreateButton của Gen2)
 MiscTab:CreateButton({
     Name = "Unload Script",
     Callback = function()
