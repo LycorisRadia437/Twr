@@ -1,6 +1,6 @@
 -- Owner : brotha2
 -- Upgraded : Lycorisradia437 & Gemini
--- Version : V5.9 (Fixed Zombie ESP: Only active & spawned zombies)
+-- Version : V6.0 (Official Rayfield Gen2 Button Implementation & Zombie ESP Fix)
 -- Game : Those Who Remain
 
 -- ── Auto Clear Cache / Config on Startup ────────────────────────
@@ -76,14 +76,14 @@ if not Rayfield then
 end
 
 local Window = Rayfield:CreateWindow({
-    Name            = "TWR Hub  |  brotha2  ·  v5.9",
+    Name            = "TWR Hub  |  brotha2  ·  v6.0",
     LoadingTitle    = "Those Who Remain",
-    LoadingSubtitle = "v5.9 - Optimized Zombie ESP",
+    LoadingSubtitle = "v6.0 - Gen2 Official Buttons Fix",
     Theme           = "Default",
     ConfigurationSaving = {
         Enabled    = true,
         FolderName = "TWR_Config",
-        FileName   = "twr_v59",
+        FileName   = "twr_v60",
     },
     KeySystem = false,
 })
@@ -126,7 +126,7 @@ do
     local label = Instance.new("TextLabel")
     label.BackgroundTransparency = 1
     label.Size = UDim2.new(1, 0, 0.55, 0)
-    label.Text = "brotha2  ·  TWR v5.9"
+    label.Text = "brotha2  ·  TWR v6.0"
     label.TextColor3 = Color3.fromRGB(235, 235, 245)
     label.TextStrokeTransparency = 0.8
     label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
@@ -144,7 +144,7 @@ do
     sub.BackgroundTransparency = 1
     sub.Size = UDim2.new(1, 0, 0.4, 0)
     sub.Position = UDim2.new(0, 0, 0.55, 0)
-    sub.Text = "v5.9  ·  zombie esp fixed"
+    sub.Text = "v6.0  ·  buttons fully working"
     sub.TextColor3 = Color3.fromRGB(140, 145, 165)
     sub.Font = Enum.Font.GothamMedium
     sub.TextSize = 10
@@ -219,7 +219,7 @@ local function isPlayer(model)
     return Players:GetPlayerFromCharacter(model) ~= nil
 end
 
--- Bộ lọc chuẩn: Chỉ nhận model có Humanoid, RootPart, còn sống, không phải player và loại bỏ các NPC cửa hàng/dummy
+-- Bộ lọc chuẩn: Chỉ nhận zombie đang spawn, có di chuyển và máu > 0
 local function updateZombieList()
     local list = {}
     for _, obj in ipairs(workspace:GetDescendants()) do
@@ -228,7 +228,6 @@ local function updateZombieList()
             local hrp = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso")
             if hum and hrp and not isPlayer(obj) and hum.Health > 0 then
                 local name = obj.Name:lower()
-                -- Loại bỏ các NPC không phải zombie (shop, merchant, dummy, tutorial, v.v.)
                 if not name:find("shop") and not name:find("merchant") and not name:find("dummy") and not name:find("tutorial") and not name:find("bank") then
                     list[obj] = true
                 end
@@ -271,7 +270,7 @@ updateZombieList()
 updateItemList()
 task.spawn(function()
     while true do
-        task.wait(3) -- Quét lại danh sách zombie nhanh hơn để bắt kịp các đợt spawn mới
+        task.wait(3)
         updateZombieList()
         updateItemList()
     end
@@ -941,7 +940,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Zombie ESP & Hitbox (Chỉ xử lý các zombie hợp lệ đã được lọc)
+    -- Zombie ESP & Hitbox
     for model in pairs(ZombieList) do
         if Config.ESP_Zombies then
             local objs = espObjects[model]
@@ -1055,10 +1054,10 @@ ESPTab:CreateSlider({
     end
 })
 
--- Nút Clear ESP Cache (Dùng cú pháp chuẩn Gen2: name & callback)
+-- Nút Clear ESP Cache (Dùng đúng chuẩn CreateButton của Gen2)
 ESPTab:CreateButton({
-    name = "Clear ESP Cache",
-    callback = function()
+    Name = "Reset Esp",
+    Callback = function()
         pcall(function()
             local container = getClientContainer()
             if container then container:ClearAllChildren() end
@@ -1070,7 +1069,7 @@ ESPTab:CreateButton({
             end
             Rayfield:Notify({
                 Title = "TWR Hub",
-                Content = "ESP cache cleared successfully!",
+                Content = "Reset esp successfully!",
                 Duration = 3,
             })
         end)
@@ -1085,15 +1084,15 @@ HitboxTab:CreateSlider({Name = "Transparency", Range = {0, 1},  Increment = 0.05
 HitboxTab:CreateSection("Style")
 HitboxTab:CreateColorPicker({Name = "Color", Color = Color3.fromRGB(255, 0, 80), Flag = "Hitbox_Color", Callback = function(v) Config.Hitbox_Color = v end})
 
--- Nút Restore (Dùng cú pháp chuẩn Gen2: name & callback)
+-- Nút Restore (Dùng đúng chuẩn CreateButton của Gen2)
 HitboxTab:CreateButton({
-    name = "Restore",
-    callback = function()
+    Name = "Reset Hitbox",
+    Callback = function()
         restoreAllHitboxes()
         pcall(function()
             Rayfield:Notify({
                 Title = "TWR Hub",
-                Content = "All hitboxes reset and restored!",
+                Content = "Reset hixbox successfully!",
                 Duration = 3,
             })
         end)
@@ -1127,10 +1126,10 @@ MiscTab:CreateToggle({Name = "Full Bright", CurrentValue = false, Flag = "FullBr
 end})
 MiscTab:CreateToggle({Name = "Anti-AFK", CurrentValue = true, Flag = "AntiAFK", Callback = function(v) Config.AntiAFK = v end})
 
--- Nút Unload Script (Dùng cú pháp chuẩn Gen2: name & callback)
+-- Nút Unload Script (Dùng đúng chuẩn CreateButton của Gen2)
 MiscTab:CreateButton({
-    name = "Unload Script",
-    callback = function()
+    Name = "Unload Script",
+    Callback = function()
         unloadScript()
         pcall(function()
             Rayfield:Notify({
@@ -1168,8 +1167,8 @@ ACTab:CreateToggle({Name = "Enable", CurrentValue = false, Flag = "AC_Bypass", C
 pcall(function()
     if Rayfield and type(Rayfield.Notify) == "function" then
         Rayfield:Notify({
-            Title = "TWR Hub v5.9",
-            Content = "Loaded successfully with filtered Zombie ESP!",
+            Title = "TWR Hub v6.0",
+            Content = "Loaded successfully with official Gen2 buttons!",
             Duration = 6.5,
         })
     end
