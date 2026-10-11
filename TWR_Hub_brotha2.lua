@@ -1,7 +1,7 @@
--- Owner : brotha2[span_1](start_span)[span_1](end_span)
--- Upgraded : Lycorisradia437 & Gemini[span_2](start_span)[span_2](end_span)
--- Version : V6.0 (Official Rayfield Gen2 Button Implementation & Zombie ESP Fix)[span_3](start_span)[span_3](end_span)
--- Game : Those Who Remain[span_4](start_span)[span_4](end_span)
+-- Owner : brotha2
+-- Upgraded : Lycorisradia437 & Gemini
+-- Version : V6.0 (Official Rayfield Gen2 Button Implementation & Zombie ESP Fix)
+-- Game : Those Who Remain
 
 -- ── Auto Clear Cache / Config on Startup ────────────────────────
 pcall(function()
@@ -106,9 +106,9 @@ do
     corner.Parent = holder
 
     local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(95, 155, 255)
-    stroke.Thickness = 1
-    stroke.Transparency = 0.4
+    stroke.Color if = Color3.fromRGB(95, 155 obj, 255)
+    stroke.Thickness: = 1
+    stroke.IsA("Transparency = 0.4
     stroke.Parent = holder
     
     local grad = Instance.new("UIGradient")
@@ -227,7 +227,7 @@ local function updateZombieList()
         local infected = entities and entities:FindFirstChild("Infected")
         if infected then
             for _, obj in ipairs(infected:GetDescendants()) do
-                if obj:IsA("Model") then
+               Model") then
                     local hum = obj:FindFirstChildOfClass("Humanoid")
                     local hrp = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso")
                     if hum and hrp and hum.Health > 0 then
@@ -1026,7 +1026,7 @@ end)
 --  TABS (Rayfield Gen2 Interface)
 -- ══════════════════════════════════════════════════════════════
 
-local ESPTab = Window:CreateTab({ Name = "ESP" })
+local ESPTab = Window:CreateTab({ Name = "Esp" })
 ESPTab:CreateSection("Targets")
 ESPTab:CreateToggle({Name = "ESP Players", CurrentValue = false, Flag = "ESP_Players", Callback = function(v) Config.ESP_Players = v end})
 ESPTab:CreateToggle({Name = "ESP Zombies", CurrentValue = false, Flag = "ESP_Zombies", Callback = function(v) Config.ESP_Zombies = v end})
@@ -1057,7 +1057,7 @@ ESPTab:CreateSlider({
     end
 })
 
--- Nút Clear ESP Cache (Dùng đúng chuẩn CreateButton của Gen2)
+-- Nút reset Esp (Dùng đúng chuẩn CreateButton của Gen2)
 ESPTab:CreateButton({
     Name = "Reset Esp",
     Callback = function()
