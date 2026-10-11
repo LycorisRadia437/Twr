@@ -1,6 +1,6 @@
 -- Owner : brotha2
--- Ugraded : Lycorisradia437 & Gemini
--- Version : V5.6 (Pill Toggles for Restore & Unload, Added ESP Reset Button)
+-- Upgraded : Lycorisradia437 & Gemini
+-- Version : V5.9 (Fixed Zombie ESP: Only active & spawned zombies)
 -- Game : Those Who Remain
 
 -- ── Auto Clear Cache / Config on Startup ────────────────────────
@@ -58,7 +58,7 @@ local Config = {
 
 local FBBackup = {}
 
--- ── Load Rayfield ──────────────────────────────────────────────
+-- ── Load Rayfield Gen2 ─────────────────────────────────────────
 local Rayfield
 local success, err = pcall(function()
     Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
@@ -76,14 +76,14 @@ if not Rayfield then
 end
 
 local Window = Rayfield:CreateWindow({
-    Name            = "TWR Hub  |  brotha2  ·  v5.6",
+    Name            = "TWR Hub  |  brotha2  ·  v5.9",
     LoadingTitle    = "Those Who Remain",
-    LoadingSubtitle = "v5.6 - Pill Toggles & ESP Reset",
+    LoadingSubtitle = "v5.9 - Optimized Zombie ESP",
     Theme           = "Default",
     ConfigurationSaving = {
         Enabled    = true,
         FolderName = "TWR_Config",
-        FileName   = "twr_v56",
+        FileName   = "twr_v59",
     },
     KeySystem = false,
 })
@@ -126,7 +126,7 @@ do
     local label = Instance.new("TextLabel")
     label.BackgroundTransparency = 1
     label.Size = UDim2.new(1, 0, 0.55, 0)
-    label.Text = "brotha2  ·  TWR v5.6"
+    label.Text = "brotha2  ·  TWR v5.9"
     label.TextColor3 = Color3.fromRGB(235, 235, 245)
     label.TextStrokeTransparency = 0.8
     label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
@@ -144,7 +144,7 @@ do
     sub.BackgroundTransparency = 1
     sub.Size = UDim2.new(1, 0, 0.4, 0)
     sub.Position = UDim2.new(0, 0, 0.55, 0)
-    sub.Text = "v5.6  ·  updated controls"
+    sub.Text = "v5.9  ·  zombie esp fixed"
     sub.TextColor3 = Color3.fromRGB(140, 145, 165)
     sub.Font = Enum.Font.GothamMedium
     sub.TextSize = 10
@@ -219,13 +219,19 @@ local function isPlayer(model)
     return Players:GetPlayerFromCharacter(model) ~= nil
 end
 
+-- Bộ lọc chuẩn: Chỉ nhận model có Humanoid, RootPart, còn sống, không phải player và loại bỏ các NPC cửa hàng/dummy
 local function updateZombieList()
     local list = {}
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("Model") then
             local hum = obj:FindFirstChildOfClass("Humanoid")
-            if hum and not isPlayer(obj) then
-                list[obj] = true
+            local hrp = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso")
+            if hum and hrp and not isPlayer(obj) and hum.Health > 0 then
+                local name = obj.Name:lower()
+                -- Loại bỏ các NPC không phải zombie (shop, merchant, dummy, tutorial, v.v.)
+                if not name:find("shop") and not name:find("merchant") and not name:find("dummy") and not name:find("tutorial") and not name:find("bank") then
+                    list[obj] = true
+                end
             end
         end
     end
@@ -265,7 +271,7 @@ updateZombieList()
 updateItemList()
 task.spawn(function()
     while true do
-        task.wait(5)
+        task.wait(3) -- Quét lại danh sách zombie nhanh hơn để bắt kịp các đợt spawn mới
         updateZombieList()
         updateItemList()
     end
@@ -935,7 +941,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Zombie ESP & Hitbox
+    -- Zombie ESP & Hitbox (Chỉ xử lý các zombie hợp lệ đã được lọc)
     for model in pairs(ZombieList) do
         if Config.ESP_Zombies then
             local objs = espObjects[model]
@@ -1049,10 +1055,10 @@ ESPTab:CreateSlider({
     end
 })
 
--- Thêm nút Clear ESP Cache dưới nút Billboard Transparency
+-- Nút Clear ESP Cache (Dùng cú pháp chuẩn Gen2: name & callback)
 ESPTab:CreateButton({
-    Name = "Clear ESP Cache",
-    Callback = function()
+    name = "Clear ESP Cache",
+    callback = function()
         pcall(function()
             local container = getClientContainer()
             if container then container:ClearAllChildren() end
@@ -1079,22 +1085,18 @@ HitboxTab:CreateSlider({Name = "Transparency", Range = {0, 1},  Increment = 0.05
 HitboxTab:CreateSection("Style")
 HitboxTab:CreateColorPicker({Name = "Color", Color = Color3.fromRGB(255, 0, 80), Flag = "Hitbox_Color", Callback = function(v) Config.Hitbox_Color = v end})
 
--- Nút Restore đổi thành nút (Button) để reset toàn bộ Hitbox
-HitboxTab:CreateToggle({
-    Name = "Restore",
-    CurrentValue = false,
-    Flag = "RestoreHitboxToggle",
-    Callback = function(v)
-        if v then
-            restoreAllHitboxes()
-            pcall(function()
-                Rayfield:Notify({
-                    Title = "TWR Hub",
-                    Content = "All hitboxes reset and restored!",
-                    Duration = 3,
-                })
-            end)
-        end
+-- Nút Restore (Dùng cú pháp chuẩn Gen2: name & callback)
+HitboxTab:CreateButton({
+    name = "Restore",
+    callback = function()
+        restoreAllHitboxes()
+        pcall(function()
+            Rayfield:Notify({
+                Title = "TWR Hub",
+                Content = "All hitboxes reset and restored!",
+                Duration = 3,
+            })
+        end)
     end
 })
 
@@ -1125,22 +1127,18 @@ MiscTab:CreateToggle({Name = "Full Bright", CurrentValue = false, Flag = "FullBr
 end})
 MiscTab:CreateToggle({Name = "Anti-AFK", CurrentValue = true, Flag = "AntiAFK", Callback = function(v) Config.AntiAFK = v end})
 
--- Nút Unload Script đổi thành nút (Button) để gỡ script
+-- Nút Unload Script (Dùng cú pháp chuẩn Gen2: name & callback)
 MiscTab:CreateButton({
-    Name = "Unload Script",
-    CurrentValue = false,
-    Flag = "UnloadScriptToggle",
-    Callback = function(v)
-        if v then
-            unloadScript()
-            pcall(function()
-                Rayfield:Notify({
-                    Title = "TWR Hub",
-                    Content = "Script unloaded successfully!",
-                    Duration = 3,
-                })
-            end)
-        end
+    name = "Unload Script",
+    callback = function()
+        unloadScript()
+        pcall(function()
+            Rayfield:Notify({
+                Title = "TWR Hub",
+                Content = "Script unloaded successfully!",
+                Duration = 3,
+            })
+        end)
     end
 })
 
@@ -1170,8 +1168,8 @@ ACTab:CreateToggle({Name = "Enable", CurrentValue = false, Flag = "AC_Bypass", C
 pcall(function()
     if Rayfield and type(Rayfield.Notify) == "function" then
         Rayfield:Notify({
-            Title = "TWR Hub v5.6",
-            Content = "Loaded successfully!",
+            Title = "TWR Hub v5.9",
+            Content = "Loaded successfully with filtered Zombie ESP!",
             Duration = 6.5,
         })
     end
