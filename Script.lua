@@ -1,6 +1,6 @@
 -- Owner : brotha2
--- Version : V5.1 (Ultimate ContextActionService Touch Sinking / Mobile Camera Fix)
 -- Ugraded : Lycorisradia437 & Gemini
+-- Version : V5.6 (Pill Toggles for Restore & Unload, Added ESP Reset Button)
 -- Game : Those Who Remain
 
 -- ── Auto Clear Cache / Config on Startup ────────────────────────
@@ -12,14 +12,14 @@ pcall(function()
     end
 end)
 
-local Players           = game:GetService("Players")
-local RunService        = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService  = game:GetService("UserInputService")
+local Players              = game:GetService("Players")
+local RunService           = game:GetService("RunService")
+local ReplicatedStorage    = game:GetService("ReplicatedStorage")
+local UserInputService     = game:GetService("UserInputService")
 local ContextActionService = game:GetService("ContextActionService")
-local TweenService      = game:GetService("TweenService")
-local Lighting          = game:GetService("Lighting")
-local StarterGui        = game:GetService("StarterGui")
+local TweenService         = game:GetService("TweenService")
+local Lighting             = game:GetService("Lighting")
+local StarterGui           = game:GetService("StarterGui")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera      = workspace.CurrentCamera
@@ -42,23 +42,23 @@ local Config = {
     Hitbox_Transparency = 0.7,
     Hitbox_Color        = Color3.fromRGB(255, 0, 80),
 
-    InfAmmo       = false,
+    InfAmmo      = false,
 
-    Fly           = false,
-    FlySpeed      = 50,
-    Speed         = false,
-    SpeedValue    = 40,
-    InfiniteJump  = false,
+    Fly          = false,
+    FlySpeed     = 50,
+    Speed        = false,
+    SpeedValue   = 40,
+    InfiniteJump = false,
 
-    FullBright    = false,
-    AntiAFK       = true,
+    FullBright   = false,
+    AntiAFK      = true,
 
-    AC_Bypass     = false,
+    AC_Bypass    = false,
 }
 
 local FBBackup = {}
 
--- ── Load Rayfield với cơ chế tự động thử lại / Backup ──────────────
+-- ── Load Rayfield ──────────────────────────────────────────────
 local Rayfield
 local success, err = pcall(function()
     Rayfield = loadstring(game:HttpGet("https://sirius.menu/gen2"))()
@@ -71,19 +71,19 @@ if not success or not Rayfield then
 end
 
 if not Rayfield then
-    warn("[TWR Hub Error]: Không thể tải thư viện giao diện Rayfield!")
+    warn("[TWR Hub Error]: Không thể tải thư viện Rayfield!")
     return
 end
 
 local Window = Rayfield:CreateWindow({
-    Name            = "TWR Hub  |  brotha2  ·  v5.1",
+    Name            = "TWR Hub  |  brotha2  ·  v5.6",
     LoadingTitle    = "Those Who Remain",
-    LoadingSubtitle = "v5.1 - Ultimate Touch Sinking Fix",
+    LoadingSubtitle = "v5.6 - Pill Toggles & ESP Reset",
     Theme           = "Default",
     ConfigurationSaving = {
         Enabled    = true,
         FolderName = "TWR_Config",
-        FileName   = "twr_v51",
+        FileName   = "twr_v56",
     },
     KeySystem = false,
 })
@@ -126,7 +126,7 @@ do
     local label = Instance.new("TextLabel")
     label.BackgroundTransparency = 1
     label.Size = UDim2.new(1, 0, 0.55, 0)
-    label.Text = "brotha2  ·  TWR v5.1"
+    label.Text = "brotha2  ·  TWR v5.6"
     label.TextColor3 = Color3.fromRGB(235, 235, 245)
     label.TextStrokeTransparency = 0.8
     label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
@@ -144,7 +144,7 @@ do
     sub.BackgroundTransparency = 1
     sub.Size = UDim2.new(1, 0, 0.4, 0)
     sub.Position = UDim2.new(0, 0, 0.55, 0)
-    sub.Text = "v5.1  ·  touch sink active"
+    sub.Text = "v5.6  ·  updated controls"
     sub.TextColor3 = Color3.fromRGB(140, 145, 165)
     sub.Font = Enum.Font.GothamMedium
     sub.TextSize = 10
@@ -648,6 +648,7 @@ local function restoreHitbox(model)
 end
 
 local function restoreAllHitboxes()
+    Config.Hitbox_Enabled = false
     for model in pairs(originalData) do
         restoreHitbox(model)
     end
@@ -813,11 +814,6 @@ task.spawn(function()
     end
 end)
 
-local cameraActionBound = false
-local function blockCameraAction(actionName, inputState, inputObject)
-    return Enum.ContextActionResult.Sink
-end
-
 local unloaded = false
 local function unloadScript()
     unloaded = true
@@ -830,21 +826,6 @@ local function unloadScript()
         if char then
             local hum = char:FindFirstChildOfClass("Humanoid")
             if hum then hum.WalkSpeed = 16 end
-        end
-    end)
-    pcall(function()
-        if cameraActionBound then
-            ContextActionService:UnbindAction("TWR_MobileCameraSink")
-            cameraActionBound = false
-        end
-    end)
-    pcall(function()
-        local pm = LocalPlayer.PlayerScripts:FindFirstChild("PlayerModule")
-        if pm then
-            local cm = require(pm)
-            if cm and cm.CameraModule and cm.CameraModule.CameraInput then
-                require(cm.CameraModule.CameraInput).setInputEnabled(true)
-            end
         end
     end)
 
@@ -914,66 +895,6 @@ RunService.RenderStepped:Connect(function()
     if unloaded then return end
 
     frameCounter = frameCounter + 1
-
-    -- Kiểm tra trạng thái mở menu Rayfield để chặn cảm ứng kéo camera trên Mobile
-    local uiOpen = false
-    pcall(function()
-        for _, gui in ipairs(LocalPlayer.PlayerGui:GetChildren()) do
-            if gui:IsA("ScreenGui") then
-                local n = gui.Name:lower()
-                if (n:find("rayfield") or n:find("sirius") or n:find("twr")) and gui.Enabled then
-                    for _, child in ipairs(gui:GetChildren()) do
-                        if child:IsA("Frame") and child.Visible and child.Size.X.Offset > 200 then
-                            uiOpen = true
-                            break
-                        end
-                    end
-                end
-            end
-        end
-    end)
-
-    if uiOpen then
-        if not cameraActionBound then
-            cameraActionBound = true
-            pcall(function()
-                ContextActionService:BindActionAtPriority(
-                    "TWR_MobileCameraSink",
-                    blockCameraAction,
-                    false,
-                    3000,
-                    Enum.UserInputType.Touch,
-                    Enum.UserInputType.MouseButton1,
-                    Enum.UserInputType.MouseMovement
-                )
-            end)
-            pcall(function()
-                local pm = LocalPlayer.PlayerScripts:FindFirstChild("PlayerModule")
-                if pm then
-                    local cm = require(pm)
-                    if cm and cm.CameraModule and cm.CameraModule.CameraInput then
-                        require(cm.CameraModule.CameraInput).setInputEnabled(false)
-                    end
-                end
-            end)
-        end
-    else
-        if cameraActionBound then
-            cameraActionBound = false
-            pcall(function()
-                ContextActionService:UnbindAction("TWR_MobileCameraSink")
-            end)
-            pcall(function()
-                local pm = LocalPlayer.PlayerScripts:FindFirstChild("PlayerModule")
-                if pm then
-                    local cm = require(pm)
-                    if cm and cm.CameraModule and cm.CameraModule.CameraInput then
-                        require(cm.CameraModule.CameraInput).setInputEnabled(true)
-                    end
-                end
-            end)
-        end
-    end
 
     if Config.Fly then
         updateFly()
@@ -1128,6 +1049,28 @@ ESPTab:CreateSlider({
     end
 })
 
+-- Thêm nút Clear ESP Cache dưới nút Billboard Transparency
+ESPTab:CreateButton({
+    Name = "Clear ESP Cache",
+    Callback = function()
+        pcall(function()
+            local container = getClientContainer()
+            if container then container:ClearAllChildren() end
+            for model in pairs(espObjects) do
+                removeESP(model)
+            end
+            for model in pairs(chamsObjects) do
+                removeChams(model)
+            end
+            Rayfield:Notify({
+                Title = "TWR Hub",
+                Content = "ESP cache cleared successfully!",
+                Duration = 3,
+            })
+        end)
+    end
+})
+
 local HitboxTab = Window:CreateTab({ Name = "Hitbox" })
 HitboxTab:CreateSection("Zombie Hitbox")
 HitboxTab:CreateToggle({Name = "Enable Hitbox", CurrentValue = false, Flag = "Hitbox_Enabled", Callback = function(v) Config.Hitbox_Enabled = v; if not v then restoreAllHitboxes() end end})
@@ -1135,7 +1078,25 @@ HitboxTab:CreateSlider({Name = "Size",         Range = {3, 60}, Increment = 1,  
 HitboxTab:CreateSlider({Name = "Transparency", Range = {0, 1},  Increment = 0.05, CurrentValue = 0.7, Flag = "Hitbox_Transparency", Callback = function(v) Config.Hitbox_Transparency = v end})
 HitboxTab:CreateSection("Style")
 HitboxTab:CreateColorPicker({Name = "Color", Color = Color3.fromRGB(255, 0, 80), Flag = "Hitbox_Color", Callback = function(v) Config.Hitbox_Color = v end})
-HitboxTab:CreateButton({Name = "Restore", Callback = function() restoreAllHitboxes() end})
+
+-- Nút Restore đổi thành nút (Button) để reset toàn bộ Hitbox
+HitboxTab:CreateToggle({
+    Name = "Restore",
+    CurrentValue = false,
+    Flag = "RestoreHitboxToggle",
+    Callback = function(v)
+        if v then
+            restoreAllHitboxes()
+            pcall(function()
+                Rayfield:Notify({
+                    Title = "TWR Hub",
+                    Content = "All hitboxes reset and restored!",
+                    Duration = 3,
+                })
+            end)
+        end
+    end
+})
 
 local WeaponTab = Window:CreateTab({ Name = "Weapon" })
 WeaponTab:CreateToggle({Name = "Infinite Ammo", CurrentValue = false, Flag = "InfAmmo", Callback = function(v) Config.InfAmmo = v end})
@@ -1163,7 +1124,25 @@ MiscTab:CreateToggle({Name = "Full Bright", CurrentValue = false, Flag = "FullBr
     applyFullBright(v)
 end})
 MiscTab:CreateToggle({Name = "Anti-AFK", CurrentValue = true, Flag = "AntiAFK", Callback = function(v) Config.AntiAFK = v end})
-MiscTab:CreateButton({Name = "Unload Script", Callback = function() unloadScript() end})
+
+-- Nút Unload Script đổi thành nút (Button) để gỡ script
+MiscTab:CreateButton({
+    Name = "Unload Script",
+    CurrentValue = false,
+    Flag = "UnloadScriptToggle",
+    Callback = function(v)
+        if v then
+            unloadScript()
+            pcall(function()
+                Rayfield:Notify({
+                    Title = "TWR Hub",
+                    Content = "Script unloaded successfully!",
+                    Duration = 3,
+                })
+            end)
+        end
+    end
+})
 
 MiscTab:CreateSection("Keybinds")
 MiscTab:CreateKeybind({
@@ -1191,8 +1170,8 @@ ACTab:CreateToggle({Name = "Enable", CurrentValue = false, Flag = "AC_Bypass", C
 pcall(function()
     if Rayfield and type(Rayfield.Notify) == "function" then
         Rayfield:Notify({
-            Title = "TWR Hub v5.1",
-            Content = "Đã bật cơ chế ContextActionService Input Sinking chặn camera hoàn toàn!",
+            Title = "TWR Hub v5.6",
+            Content = "Loaded successfully!",
             Duration = 6.5,
         })
     end
