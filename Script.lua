@@ -1,5 +1,6 @@
 -- Owner : brotha2
 -- Version : V5.1 (Ultimate ContextActionService Touch Sinking / Mobile Camera Fix)
+-- Ugraded : Lycorisradia437 & Gemini
 -- Game : Those Who Remain
 
 -- ── Auto Clear Cache / Config on Startup ────────────────────────
